@@ -6,14 +6,11 @@ import (
 
 	"fmt"
 
+	"github.com/agkountis/go-listr-backend/internal/contracts"
 	"github.com/agkountis/go-listr-backend/internal/model"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
-
-type createListRequest struct {
-	Name string
-}
 
 func CreateList(c *gin.Context) {
 	db, ok := c.MustGet("db").(*gorm.DB)
@@ -25,12 +22,13 @@ func CreateList(c *gin.Context) {
 
 	decoder := json.NewDecoder(c.Request.Body)
 
-	var bodyJson createListRequest
+	var bodyJson contracts.CreateListRequest
 	err := decoder.Decode(&bodyJson)
 
 	if err != nil {
 		// Failed JSON decodig might not always be the users fault.
 		c.AbortWithError(http.StatusBadRequest, err)
+		return
 	}
 
 	record := model.List{Name: bodyJson.Name}
@@ -44,10 +42,6 @@ func CreateList(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"id": fmt.Sprintf("%v", record.ID),
 	})
-}
-
-type getListsResponse struct {
-	Lists []model.List `json:"lists"`
 }
 
 func GetLists(c *gin.Context) {
@@ -67,7 +61,31 @@ func GetLists(c *gin.Context) {
 	}
 
 	encoder := json.NewEncoder(c.Writer)
-	err = encoder.Encode(&getListsResponse{Lists: lists})
+	err = encoder.Encode(&contracts.GetListsResponse{Lists: lists})
+
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+	}
+}
+
+func GetListItems(c *gin.Context) {
+	db, ok := c.MustGet("db").(*gorm.DB)
+
+	if !ok {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	var items []model.Item
+	err := db.Find(&items).Error
+
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	encoder := json.NewEncoder(c.Writer)
+	err = encoder.Encode(&contracts.GetListItemsResponse{Items: items})
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
