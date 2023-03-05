@@ -13,9 +13,9 @@ func main() {
 		migrator.DropTable(&model.List{})
 	}
 
-	if migrator.HasTable(&model.Item{}) {
-		migrator.DropTable(&model.Item{})
+	if migrator.HasTable(&model.ListItem{}) {
+		migrator.DropTable(&model.ListItem{})
 	}
 
-	db.AutoMigrate(&model.List{}, &model.Item{})
+	db.AutoMigrate(&model.List{}, &model.ListItem{})
 }

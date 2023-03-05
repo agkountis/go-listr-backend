@@ -7,9 +7,9 @@ type List struct {
 	Name string    `gorm:"not null"`
 }
 
-type Item struct {
+type ListItem struct {
 	ID     uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4()" json:"id"`
-	Value  string    `gorm:"not null"`
+	Data   string    `gorm:"not null"`
 	ListID uuid.UUID `gorm:"not null"`
-	List   List
+	List   List      `json:"-"`
 }

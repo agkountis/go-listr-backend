@@ -8,5 +8,5 @@ import (
 func main() {
 	db := db.OpenConnection()
 
-	db.Migrator().DropTable(&model.List{}, &model.Item{})
+	db.Migrator().DropTable(&model.List{}, &model.ListItem{})
 }
