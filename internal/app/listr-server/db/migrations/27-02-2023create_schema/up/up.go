@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/agkountis/go-listr-backend/internal/db"
-	"github.com/agkountis/go-listr-backend/internal/model"
+	"github.com/agkountis/go-listr-backend/internal/app/listr-server/db"
+	"github.com/agkountis/go-listr-backend/internal/app/listr-server/model"
 )
 
 func main() {

@@ -1,7 +1,7 @@
 package contracts
 
 import (
-	"github.com/agkountis/go-listr-backend/internal/model"
+	"github.com/agkountis/go-listr-backend/internal/app/listr-server/model"
 	"github.com/google/uuid"
 )
 

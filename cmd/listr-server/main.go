@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/agkountis/go-listr-backend/internal/db"
-	"github.com/agkountis/go-listr-backend/internal/endpoints"
+	"github.com/agkountis/go-listr-backend/internal/app/listr-server/db"
+	"github.com/agkountis/go-listr-backend/internal/app/listr-server/endpoints"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
