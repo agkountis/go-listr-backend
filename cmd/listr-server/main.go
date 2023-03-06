@@ -1,16 +1,18 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/agkountis/go-listr-backend/internal/db"
 	"github.com/agkountis/go-listr-backend/internal/endpoints"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// Self signed certs are a paint to work with. //TODO
-// var selfSignedCertsPath string = os.Getenv("DOMAIN_SELF_SIGNED_CERTS_PATH")
-// var certFilePath string = fmt.Sprintf("%v/domain.crt", selfSignedCertsPath)
-// var keyFilePath string = fmt.Sprintf("%v/domain.key", selfSignedCertsPath)
+var selfSignedCertsPath string = os.Getenv("DOMAIN_SELF_SIGNED_CERTS_PATH")
+var certFilePath string = fmt.Sprintf("%v/localhost.pem", selfSignedCertsPath)
+var keyFilePath string = fmt.Sprintf("%v/localhost-key.pem", selfSignedCertsPath)
 
 func main() {
 	var DB *gorm.DB = db.OpenConnection()
@@ -33,7 +35,5 @@ func main() {
 	v1.DELETE("lists", endpoints.DeleteList)
 	v1.DELETE("lists/:id", endpoints.DeleteListItem)
 
-	// Self signed certs are a pain to work with. //TODO
-	// r.RunTLS("0.0.0.0:8080", certFilePath, keyFilePath)
-	r.Run("0.0.0.0:8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	r.RunTLS("0.0.0.0:8080", certFilePath, keyFilePath)
 }
