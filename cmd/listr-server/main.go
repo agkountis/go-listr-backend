@@ -35,5 +35,7 @@ func main() {
 	v1.DELETE("lists", endpoints.DeleteList)
 	v1.DELETE("lists/:id", endpoints.DeleteListItem)
 
+	v1.PATCH("lists/:id", endpoints.UpdateList)
+
 	r.RunTLS("0.0.0.0:8080", certFilePath, keyFilePath)
 }

@@ -13,6 +13,10 @@ type CreateListRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
+type UpdateListRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
 type CreateListItemRequest struct {
 	Data string `json:"data" binding:"required"`
 }

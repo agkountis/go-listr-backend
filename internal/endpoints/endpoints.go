@@ -49,7 +49,7 @@ func CreateList(c *gin.Context) {
 	})
 }
 
-func GetLists(c *gin.Context) {
+func UpdateList(c *gin.Context) {
 	db, ok := c.MustGet("db").(*gorm.DB)
 
 	if !ok {
@@ -57,15 +57,45 @@ func GetLists(c *gin.Context) {
 		return
 	}
 
-	var lists []model.List
-	err := db.Find(&lists).Error
+	listId, err := uuid.Parse(c.Param("id"))
 
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+	if !listExists(db, listId) {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"message": fmt.Sprintf("List with id `%v` does not exist.", listId),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, &contracts.GetListsResponse{Lists: lists})
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"message": "Malformed list UUID.",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	var updateListRequest contracts.UpdateListRequest
+	if err := c.BindJSON(&updateListRequest); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"message": "Malformed request body JSON",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	err = db.Model(&model.List{ID: listId}).Update("name", updateListRequest.Name).Error
+
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"list_id":  listId,
+		"new_name": updateListRequest.Name,
+	})
 }
 
 func DeleteList(c *gin.Context) {
@@ -101,6 +131,25 @@ func DeleteList(c *gin.Context) {
 	})
 }
 
+func GetLists(c *gin.Context) {
+	db, ok := c.MustGet("db").(*gorm.DB)
+
+	if !ok {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	var lists []model.List
+	err := db.Find(&lists).Error
+
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, &contracts.GetListsResponse{Lists: lists})
+}
+
 func CreateListItem(c *gin.Context) {
 	db, ok := c.MustGet("db").(*gorm.DB)
 
@@ -131,17 +180,6 @@ func CreateListItem(c *gin.Context) {
 	var createListItemRequest contracts.CreateListItemRequest
 	if err = c.BindJSON(&createListItemRequest); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
-		return
-	}
-
-	var itemFound model.ListItem
-	err = db.Where(&model.ListItem{ListID: listId, Data: createListItemRequest.Data}).First(&itemFound).Error
-
-	if err == nil {
-		c.AbortWithStatusJSON(http.StatusConflict, gin.H{
-			"list_item": &itemFound,
-			"message":   fmt.Sprintf("List item with value '%v' already exists.", itemFound.Data),
-		})
 		return
 	}
 
