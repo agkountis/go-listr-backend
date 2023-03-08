@@ -9,10 +9,6 @@ require (
 	gorm.io/gorm v1.24.5
 )
 
-// replace github.com/agkountis/go-listr-backend/endpoints v1.0.0 => ./endpoints
-
-// replace github.com/agkountis/go-listr-backend/model v1.0.0 => ./model
-
 require (
 	github.com/bytedance/sonic v1.8.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect

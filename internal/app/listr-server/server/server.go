@@ -1,4 +1,4 @@
-package endpoints
+package server
 
 import (
 	"errors"
@@ -6,22 +6,92 @@ import (
 
 	"fmt"
 
-	"github.com/agkountis/go-listr-backend/internal/app/listr-server/contracts"
-	"github.com/agkountis/go-listr-backend/internal/app/listr-server/model"
+	"github.com/agkountis/go-listr-backend/internal/app/listr-server/database"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-func CreateList(c *gin.Context) {
-	db, ok := c.MustGet("db").(*gorm.DB)
+type getListsResponse struct {
+	Lists []database.List `json:"lists"`
+}
 
-	if !ok {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
+type createListRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+type updateListRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+type createListItemRequest struct {
+	Data string `json:"data" binding:"required"`
+}
+
+type createListItemResponse struct {
+	ListItemId uuid.UUID `json:"list_item_id"`
+	ListId     uuid.UUID `json:"list_id"`
+}
+
+type getListItemsResponse struct {
+	Items []database.ListItem `json:"items"`
+}
+
+type deleteListItemRequest struct {
+	ListItemId uuid.UUID `json:"list_item_id" binding:"required"`
+}
+
+type deleteListRequest struct {
+	ID uuid.UUID `json:"id" binding:"required"`
+}
+
+type Server struct {
+	db *gorm.DB
+}
+
+func New() (*Server, error) {
+	db, err := database.OpenConnection()
+
+	if err != nil {
+		return nil, err
 	}
 
-	var bodyJson contracts.CreateListRequest
+	return &Server{db: db}, nil
+}
+
+func (server *Server) Start(addr string) {
+	r := server.createAndInitGinEngine()
+	r.Run(addr)
+}
+
+func (server *Server) StartTLS(addr string, certFilePath string, keyFilePath string) {
+	r := server.createAndInitGinEngine()
+	r.RunTLS(addr, certFilePath, keyFilePath)
+}
+
+func (server *Server) createAndInitGinEngine() *gin.Engine {
+	r := gin.Default()
+
+	v1 := r.Group("/v1")
+
+	v1.POST("/lists", server.createList)
+	v1.POST("/lists/:id", server.createListItem)
+
+	v1.GET("/lists", server.getLists)
+	v1.GET("/lists/:id", server.getListItems)
+
+	v1.DELETE("lists", server.deleteList)
+	v1.DELETE("lists/:id", server.deleteListItem)
+
+	v1.PATCH("lists/:id", server.updateList)
+
+	return r
+}
+
+func (server *Server) createList(c *gin.Context) {
+	db := server.db
+
+	var bodyJson createListRequest
 	if err := c.BindJSON(&bodyJson); err != nil {
 		// Failed JSON decodig might not always be the users fault.
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
@@ -36,7 +106,7 @@ func CreateList(c *gin.Context) {
 		return
 	}
 
-	record := model.List{Name: bodyJson.Name}
+	record := database.List{Name: bodyJson.Name}
 	result := db.Create(&record)
 
 	if err := result.Error; err != nil {
@@ -49,13 +119,8 @@ func CreateList(c *gin.Context) {
 	})
 }
 
-func UpdateList(c *gin.Context) {
-	db, ok := c.MustGet("db").(*gorm.DB)
-
-	if !ok {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
+func (server *Server) updateList(c *gin.Context) {
+	db := server.db
 
 	listId, err := uuid.Parse(c.Param("id"))
 
@@ -74,7 +139,7 @@ func UpdateList(c *gin.Context) {
 		return
 	}
 
-	var updateListRequest contracts.UpdateListRequest
+	var updateListRequest updateListRequest
 	if err := c.BindJSON(&updateListRequest); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 			"message": "Malformed request body JSON",
@@ -83,7 +148,7 @@ func UpdateList(c *gin.Context) {
 		return
 	}
 
-	err = db.Model(&model.List{ID: listId}).Update("name", updateListRequest.Name).Error
+	err = db.Model(&database.List{ID: listId}).Update("name", updateListRequest.Name).Error
 
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
@@ -98,28 +163,23 @@ func UpdateList(c *gin.Context) {
 	})
 }
 
-func DeleteList(c *gin.Context) {
-	db, ok := c.MustGet("db").(*gorm.DB)
+func (server *Server) deleteList(c *gin.Context) {
+	db := server.db
 
-	if !ok {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	var deleteListRequest contracts.DeleteListRequest
+	var deleteListRequest deleteListRequest
 	if err := c.BindJSON(&deleteListRequest); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 
-	err := db.Where(&model.ListItem{ListID: deleteListRequest.ID}).Delete(&model.ListItem{}).Error
+	err := db.Where(&database.ListItem{ListID: deleteListRequest.ID}).Delete(&database.ListItem{}).Error
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	err = db.Delete(&model.List{ID: deleteListRequest.ID}).Error
+	err = db.Delete(&database.List{ID: deleteListRequest.ID}).Error
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -131,15 +191,10 @@ func DeleteList(c *gin.Context) {
 	})
 }
 
-func GetLists(c *gin.Context) {
-	db, ok := c.MustGet("db").(*gorm.DB)
+func (server *Server) getLists(c *gin.Context) {
+	db := server.db
 
-	if !ok {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	var lists []model.List
+	var lists []database.List
 	err := db.Find(&lists).Error
 
 	if err != nil {
@@ -147,16 +202,11 @@ func GetLists(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, &contracts.GetListsResponse{Lists: lists})
+	c.JSON(http.StatusOK, &getListsResponse{Lists: lists})
 }
 
-func CreateListItem(c *gin.Context) {
-	db, ok := c.MustGet("db").(*gorm.DB)
-
-	if !ok {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
+func (server *Server) createListItem(c *gin.Context) {
+	db := server.db
 
 	listIdStr := c.Params.ByName("id")
 
@@ -177,13 +227,13 @@ func CreateListItem(c *gin.Context) {
 		return
 	}
 
-	var createListItemRequest contracts.CreateListItemRequest
+	var createListItemRequest createListItemRequest
 	if err = c.BindJSON(&createListItemRequest); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 
-	record := model.ListItem{Data: createListItemRequest.Data, ListID: listId}
+	record := database.ListItem{Data: createListItemRequest.Data, ListID: listId}
 	err = db.Create(&record).Error
 
 	if err != nil {
@@ -191,16 +241,11 @@ func CreateListItem(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, &record)
+	c.JSON(http.StatusCreated, &createListItemResponse{ListItemId: record.ID, ListId: record.ListID})
 }
 
-func GetListItems(c *gin.Context) {
-	db, ok := c.MustGet("db").(*gorm.DB)
-
-	if !ok {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
+func (server *Server) getListItems(c *gin.Context) {
+	db := server.db
 
 	listId, err := uuid.Parse(c.Param("id"))
 
@@ -216,26 +261,21 @@ func GetListItems(c *gin.Context) {
 		return
 	}
 
-	var items []model.ListItem
-	err = db.Where(&model.ListItem{ListID: listId}).Find(&items).Error
+	var items []database.ListItem
+	err = db.Where(&database.ListItem{ListID: listId}).Find(&items).Error
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, &contracts.GetListItemsResponse{Items: items})
+	c.JSON(http.StatusOK, &getListItemsResponse{Items: items})
 }
 
-func DeleteListItem(c *gin.Context) {
-	db, ok := c.MustGet("db").(*gorm.DB)
+func (server *Server) deleteListItem(c *gin.Context) {
+	db := server.db
 
-	if !ok {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	var reqBody contracts.DeleteListItemRequest
+	var reqBody deleteListItemRequest
 	if err := c.BindJSON(&reqBody); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
@@ -247,7 +287,7 @@ func DeleteListItem(c *gin.Context) {
 		return
 	}
 
-	err := db.Delete(&model.ListItem{ID: reqBody.ListItemId, ListID: listId}).Error
+	err := db.Delete(&database.ListItem{ID: reqBody.ListItemId, ListID: listId}).Error
 
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -258,6 +298,6 @@ func DeleteListItem(c *gin.Context) {
 }
 
 func listExists(db *gorm.DB, listId uuid.UUID) bool {
-	err := db.Where(&model.List{ID: listId}).First(&model.List{}).Error
+	err := db.Where(&database.List{ID: listId}).First(&database.List{}).Error
 	return !errors.Is(err, gorm.ErrRecordNotFound)
 }
