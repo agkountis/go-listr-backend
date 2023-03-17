@@ -45,6 +45,10 @@ type deleteListRequest struct {
 	ID uuid.UUID `json:"id" binding:"required"`
 }
 
+type deleteListResponse struct {
+	ID uuid.UUID `json:"id" binding:"required"`
+}
+
 type Server struct {
 	db *gorm.DB
 }
@@ -64,7 +68,7 @@ func (server *Server) Start(addr string) {
 	r.Run(addr)
 }
 
-func (server *Server) StartTLS(addr string, certFilePath string, keyFilePath string) {
+func (server *Server) StartTLS(addr, certFilePath, keyFilePath string) {
 	r := server.createAndInitGinEngine()
 	r.RunTLS(addr, certFilePath, keyFilePath)
 }
@@ -91,8 +95,8 @@ func (server *Server) createAndInitGinEngine() *gin.Engine {
 func (server *Server) createList(c *gin.Context) {
 	db := server.db
 
-	var bodyJson createListRequest
-	if err := c.BindJSON(&bodyJson); err != nil {
+	var createListRequest createListRequest
+	if err := c.BindJSON(&createListRequest); err != nil {
 		// Failed JSON decodig might not always be the users fault.
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 			"message": "Failed to deserialize JSON body.",
@@ -101,15 +105,13 @@ func (server *Server) createList(c *gin.Context) {
 		return
 	}
 
-	if bodyJson.Name == "" {
+	if createListRequest.Name == "" {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"message": "List name cannot be emtpy"})
 		return
 	}
 
-	record := database.List{Name: bodyJson.Name}
-	result := db.Create(&record)
-
-	if err := result.Error; err != nil {
+	record := database.List{Name: createListRequest.Name}
+	if err := db.Create(&record).Error; err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
@@ -186,9 +188,7 @@ func (server *Server) deleteList(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id": deleteListRequest,
-	})
+	c.JSON(http.StatusOK, &deleteListResponse{ID: deleteListRequest.ID})
 }
 
 func (server *Server) getLists(c *gin.Context) {
